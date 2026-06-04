@@ -367,7 +367,24 @@ boot();
 
 async function boot() {
   const authMessage = authMessageFromUrl();
-  const [config, me] = await Promise.all([api("/api/config"), api("/api/me")]);
+  let config;
+  let me;
+
+  try {
+    [config, me] = await Promise.all([api("/api/config"), api("/api/me")]);
+  } catch (error) {
+    console.warn("API is unavailable; rendering static preview mode.", error);
+    config = {
+      feishuConfigured: false,
+      redirectUri: "需要部署 Node 后端后启用",
+      scopes: []
+    };
+    me = {
+      authenticated: false,
+      staticPreview: true
+    };
+  }
+
   state.config = config;
   state.me = me;
 
@@ -402,6 +419,7 @@ function render() {
 
 function renderLogin() {
   const configured = state.config?.feishuConfigured;
+  const staticPreview = state.me?.staticPreview;
   app.innerHTML = `
     <section class="login-grid">
       <div class="preview-stage">
@@ -426,12 +444,14 @@ function renderLogin() {
             </div>
           </div>
           ${
-            configured
+            staticPreview
+              ? `<div class="setup-note">当前是 Netlify 静态预览。页面可以展示，登录和农场数据需要部署 Node 后端或改成 Netlify Functions 后启用。</div>`
+              : configured
               ? ""
               : `<div class="setup-note">先把 <strong>.env</strong> 里的 FEISHU_APP_ID 和 FEISHU_APP_SECRET 填好，并在飞书开发者后台配置同一个回调地址。</div>`
           }
         </div>
-        <button id="loginButton" ${configured ? "" : "disabled"}>使用飞书登录</button>
+        <button id="loginButton" ${configured ? "" : "disabled"}>${staticPreview ? "静态预览中" : "使用飞书登录"}</button>
       </aside>
     </section>
   `;
